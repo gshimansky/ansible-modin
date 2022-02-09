@@ -1,0 +1,4 @@
+<network ipv6='yes'>
+  <name>CLUSTER_1</name>
+  <bridge name='clusbr1' stp='off' delay='0'/>
+</network>

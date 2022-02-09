@@ -1,0 +1,47 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+Vagrant.configure(2) do |config|
+  unless Vagrant.has_plugin?("vagrant-reload")
+    raise 'Plugin vagrant-reload is not installed!'
+  end
+
+  if Vagrant.has_plugin?("vagrant-proxyconf")
+    config.proxy.http     = ENV.fetch('http_proxy', false)
+    config.proxy.https    = ENV.fetch('https_proxy', false)
+    config.proxy.no_proxy = ENV.fetch('no_proxy', false)
+  end
+
+  main_vm_name = "main"
+  config.vm.box = "generic/ubuntu2004"
+
+  # Docker server port
+#  config.vm.network "forwarded_port", guest: 2375, host: 2375, auto_correct: true
+
+  config.vm.provider "libvirt" do |lv|
+    lv.driver = "kvm"
+    lv.memory = "4096"
+    lv.cpus = 4
+    lv.storage_pool_name = "images"
+  end
+
+  config.vm.provider "virtualbox" do |vb|
+    vb.gui = false
+    vb.memory = "4096"
+    vb.cpus = 4
+  end
+
+  config.vm.provision "ansible" do |ansible|
+    ansible.playbook = "main-provision.yaml"
+  end
+  config.vm.provision :reload
+
+  config.vm.define "#{main_vm_name}" do |node|
+    node.vm.hostname = "#{main_vm_name}"
+
+      node.vm.network "private_network",
+                      auto_config: false,
+                      :model_type => 'virtio',
+                      :network_name => 'CLUSTER_1'
+  end
+end

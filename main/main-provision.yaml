@@ -1,0 +1,94 @@
+---
+# Network interfaces configurations
+- name: Configure netplan on system interface
+  hosts: all
+  become: true
+  tasks:
+    - name: Replace netplan config file
+      template:
+        src: 10-ens5.yaml
+        dest: /etc/netplan/10-ens5.yaml
+        owner: 'root'
+        group: 'root'
+        mode: '0644'
+    - name: Disable default DNS servers
+      replace:
+        path: /etc/systemd/resolved.conf
+        regexp: 'DNS=.*'
+        replace: 'DNS='
+    - name: Disable DNSSEC
+      replace:
+        path: /etc/systemd/resolved.conf
+        regexp: 'DNSSEC=yes'
+        replace: 'DNSSEC=no'
+
+- name: Set IP on cluster interface
+  hosts: all
+  become: true
+  vars_files:
+    - settings.yaml
+  tasks:
+    - name: Set netplan config for ens6 interface
+      template:
+        src: 10-ens6.yaml
+        dest: /etc/netplan/10-ens6.yaml
+        owner: 'root'
+        group: 'root'
+        mode: '0644'
+
+- name: Configure boot parameters
+  hosts: all
+  become: true
+  tasks:
+    - name: Enable biosdevice names for network interfaces
+      replace:
+        path: /etc/default/grub
+        regexp: 'biosdevname=0'
+        replace: 'biosdevname=1'
+      notify: Run update-grub
+    - name: Enable interface names for network interfaces
+      replace:
+        path: /etc/default/grub
+        regexp: 'net.ifnames=0'
+        replace: 'net.ifnames=1'
+      notify: Run update-grub
+    - name: Disable quiet boot
+      replace:
+        path: /etc/default/grub
+        regexp: 'quiet'
+        replace: ''
+      notify: Run update-grub
+  handlers:
+    - name: Run update-grub
+      command: update-grub
+
+# Download deepops repo
+- name: Clone deepops repo
+  hosts: all
+  become: false
+  tasks:
+    - name: git clone https://github.com/NVIDIA/deepops.git
+      git:
+        repo: 'https://github.com/NVIDIA/deepops.git'
+        dest: /home/vagrant/deepops
+        version: '22.01'
+        track_submodules: true
+
+# Install everything that is needed to use deepops including ansible
+- name: Run deepops/scripts/setup.sh script
+  hosts: all
+  become: false
+  tasks:
+    - name: deepops/scripts/setup.sh
+      command: bash /home/vagrant/deepops/scripts/setup.sh
+      args:
+        creates: /opt/deepops
+
+# Provision MAAS on main host
+- name: Install maas packages on main host
+  hosts: all
+  become: true
+  vars_files:
+    - settings.yaml
+  roles:
+    - role: mrlesmithjr.maas

@@ -1,0 +1,8 @@
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ens6:
+      dhcp4: no
+      dhcp6: no
+      addresses: [{{ cluster_net_ip }}/24]
