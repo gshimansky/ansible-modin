@@ -14,7 +14,7 @@ for i in $(seq 1 3); do
                  --input mouse \
                  --serial pty \
                  --console pty \
-                 --boot network \
+                 --boot network,hd \
                  --noautoconsole \
                  --noreboot \
                  --wait
