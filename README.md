@@ -127,6 +127,6 @@ Here are instructions on requirements and usage:
     from MAAS web console, but it is better to use host names. MAAS
     runs its own name server, so it is necessary to switch to using
     it. This step is not automated yet, so you need to do steps from
-    #1.
+    [#1](https://github.com/gshimansky/ansible-modin/issues/1).
     Also vagrant user needs a private key from step #6, so if you
     haven't copied it into `~vagrant/.ssh/id_rsa`, do it now.
