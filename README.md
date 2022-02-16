@@ -130,3 +130,62 @@ Here are instructions on requirements and usage:
     [#1](https://github.com/gshimansky/ansible-modin/issues/1).
     Also vagrant user needs a private key from step #6, so if you
     haven't copied it into `~vagrant/.ssh/id_rsa`, do it now.
+
+## Enabling network on cluster VMs
+
+MAAS by default provides a proxy service for VMs so that they are able
+to install Ubuntu packages. No other network is available for them. To
+install other software (e.g. python packages) it is necessary to
+enable NATed internet access for VMs.
+
+1. Libvirt already defines multiple chains on MAAS machine, so the
+   following two commands should enable forwarding of VM traffic to the
+   internet.
+
+   ```
+   sudo iptables -t nat -A LIBVIRT_PRT -p all -s 172.22.2.0/24 \! -d 172.22.2.0/24 -j MASQUERADE
+   sudo iptables -A LIBVIRT_FWI -p all -o clusbr1 -d 172.22.2.0/24 -m state --state ESTABLISHED,RELATED -j ACCEPT
+   ```
+
+   But this does not survive a reboot of main node.
+2. To make forwarding on MAAS node permanent create a file
+   `/etc/systemd/system/cluster-forward.service`:
+   ```
+   [Unit]
+   Description=Forward packets from clusbr1
+   After=multi-user.target
+
+   [Service]
+   Type=oneshot
+   ExecStart=iptables -w -t nat -A LIBVIRT_PRT -p all -s 172.22.2.0/24 ! -d 172.22.2.0/24 -j MASQUERADE
+   ExecStart=iptables -w -A LIBVIRT_FWI -p all -o clusbr1 -d 172.22.2.0/24 -m state --state ESTABLISHED,RELATED -j ACCEPT
+   RemainAfterExit=true
+   ExecStop=iptables -w -t nat -D LIBVIRT_PRT -p all -s 172.22.2.0/24 ! -d 172.22.2.0/24 -j MASQUERADE
+   ExecStop=iptables -w -A LIBVIRT_FWI -p all -o clusbr1 -d 172.22.2.0/24 -m state --state ESTABLISHED,RELATED -j ACCEPT
+   StandardOutput=journal
+
+   [Install]
+   WantedBy=default.target
+   ```
+
+   then add this new service to systemd startup:
+   ```
+   sudo systemctl daemon-reload
+   sudo systemctl enable cluster-forward.service
+   ```
+
+3. On each of the VMs execute this command to enable default route:
+   ```
+   sudo ip route add default via 172.22.2.254
+   ```
+
+   but this does not survive a reboot of cluster nodes.
+4. To make route setting permanent, the following lines have to be
+   added to `/etc/netplan/50-cloud-init.yaml`:
+   ```
+            routes:
+                - to: default
+                  via: 172.22.2.254
+   ```
+
+5. Internet access should be enabled now on all cluster nodes.
